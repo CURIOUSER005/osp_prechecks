@@ -1,18 +1,19 @@
-BBlue='\033[1;34m'
-BRed='\033[1;31m'
+BBlue='\033[0;94m'
+BRed='\033[0;91m'
 NC='\033[0m'
-BYellow='\033[1;33m'
+BYellow='\033[0;93m'
+BGreen='\033[0;92m'
 source /home/stack/stackrc
-echo -e "\n\e${BBlue}Collecting Heat Stack status [openstack stack list]\e${NC} " | tee  stack_status_$(date +"%Y-%m-%d")
+echo -e "\n\e${BBlue}Collecting Heat Stack status \e${NC} " | tee  stack_status_$(date +"%Y-%m-%d")
 openstack stack list | tee  -a stack_status_$(date +"%Y-%m-%d")
 
-echo -e "\n\e${BBlue}Collecting Ansible Stack status [openstack overcloud status]\e\e${NC} " | tee  -a stack_status_$(date +"%Y-%m-%d")
+echo -e "\n\e${BBlue}Collecting Ansible Stack status \e${NC} " | tee  -a stack_status_$(date +"%Y-%m-%d")
 openstack overcloud status | tee  -a stack_status_$(date +"%Y-%m-%d")
 
-echo -e "\n\e${BBlue}Collecting if all Baremetal are in Active State and not in Maintenance State\e${NC}" | tee  -a stack_status_$(date +"%Y-%m-%d")
+echo -e "\n\e${BBlue}Collecting BAREMETAL Details\e${NC}" | tee  -a stack_status_$(date +"%Y-%m-%d")
 openstack baremetal node list | tee  -a stack_status_$(date +"%Y-%m-%d")
 
-echo -e "\n\e${BBlue}Collecting if all nova status is fine\e${NC}" | tee  -a stack_status_$(date +"%Y-%m-%d")
+echo -e "\n\e${BBlue}Collecting NOVA status \e${NC}" | tee  -a stack_status_$(date +"%Y-%m-%d")
 openstack server list | tee  -a stack_status_$(date +"%Y-%m-%d")
 
 echo -e "\n\e${BBlue}Collecting the Blacklisted node details\e${NC}" | tee  -a stack_status_$(date +"%Y-%m-%d")
@@ -29,12 +30,28 @@ openstack volume service list | tee  -a stack_status_$(date +"%Y-%m-%d")
 echo -e "\n\e${BBlue}Network Agent list\e${NC}" | tee  -a stack_status_$(date +"%Y-%m-%d")
 openstack network agent list | tee  -a stack_status_$(date +"%Y-%m-%d")
 
-echo -e "\n\e${BBlue}Pcs Status\e${NC}" | tee  -a stack_status_$(date +"%Y-%m-%d")
+echo -e "\n\e${BBlue}PCS Status\e${NC}" | tee  -a stack_status_$(date +"%Y-%m-%d")
 ssh heat-admin@$1 "sudo pcs status" | tee  -a stack_status_$(date +"%Y-%m-%d")
+
+#if [ ! -f ./ansible.cfg ]; 
+#then
+#    cat >ansible.cfg <<-EOF
+#    [defaults]
+#    deprecation_warnings = False
+#    EOF
+#fi
+
+source /home/stack/stackrc
+
+echo -e  "\n\e${BBlue}Controller Systemctl Failed Services${NC}" | tee  -a stack_status_$(date +"%Y-%m-%d")
+ansible -i $(which tripleo-ansible-inventory) Controller -m shell -a "sudo systemctl -a |egrep -i failed" | tee  -a stack_status_$(date +"%Y-%m-%d")
+
+echo -e  "\n\e${BBlue}Compute Systemctl Failed Services${NC}" | tee  -a stack_status_$(date +"%Y-%m-%d")
+ansible -i $(which tripleo-ansible-inventory) Compute -m shell -a "sudo systemctl -a |egrep -i 'failed|stopped'" | tee  -a stack_status_$(date +"%Y-%m-%d")
 
 ctrl_host=$1
 
-source /home/stack/stackrc
+
 
 stack_list () {
     if openstack stack list -c 'Stack Status' -f value |egrep -v COMPLETE;
@@ -54,7 +71,9 @@ stack_status () {
 }
 
 pcs_status () {
-	echo -e "\n======================= ${BYellow}Pacemaker Stopped Resource Details${NC} ======================= \e${BRed} \n $(ssh heat-admin@$ctrl_host 'sudo pcs status |egrep -i "failed|stopped"')\e${NC}" | tee  -a stack_status_$(date +"%Y-%m-%d")
+        echo -e "\n======================= ${BYellow}Pacemaker Stopped Resource Details${NC} ======================= \e${BRed} \n $(ssh heat-admin@$ctrl_host 'sudo pcs status |egrep -i "failed|stopped"')\e${NC}" | tee  -a stack_status_$(date +"%Y-%m-%d")
 }
 
 stack_list
+
+echo -e "\e${BBlue} The ouptut is collected in \e${BGreen}stack_status_$(date +"%Y-%m-%d")\e${BBlue} in same directory\e${NC}"
